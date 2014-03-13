@@ -22,20 +22,27 @@ function! VimuxRunLastCommand()
 endfunction
 
 function! VimuxRunCommand(command, ...)
+  let g:vimux_command = a:command
+  let g:vimux_command_options = a:000
+
   if !exists("g:VimuxRunnerIndex") || _VimuxHasRunner(g:VimuxRunnerIndex) == -1
     call VimuxOpenRunner()
   endif
 
   let l:autoreturn = 1
-  if exists("a:1")
-    let l:autoreturn = a:1
+  if exists("a:1") && get(a:000, 1) != "false"
+    let l:autoreturn = 0
+  endif
+
+  if exists("g:vimux_command_processors")
+    call _VimuxPreRunCommand()
   endif
 
   let resetSequence = _VimuxOption("g:VimuxResetSequence", "q C-u")
   let g:VimuxLastCommand = a:command
 
   call VimuxSendKeys(resetSequence)
-  call VimuxSendText(a:command)
+  call VimuxSendText(g:vimux_command)
 
   if l:autoreturn == 1
     call VimuxSendKeys("Enter")
@@ -170,3 +177,12 @@ endfunction
 function! _VimuxHasRunner(index)
   return match(system("tmux list-"._VimuxRunnerType()."s"), a:index.":")
 endfunction
+
+function! _VimuxPreRunCommand()
+  for preprocessor in g:vimux_command_processors
+    let Fn = function(preprocessor)
+    call Fn()
+    unlet Fn
+  endfor
+endfunction
+
